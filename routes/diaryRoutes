@@ -1,0 +1,90 @@
+const express = require("express");
+const router = express.Router();
+const fs = require("fs");
+
+// Path to the data file
+const DATA_FILE = './data.json';
+
+// Helper function to read entries from JSON file
+function readEntries() {
+    try {
+        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    } catch (error) {
+        return []; // If file is empty or not found, return an empty array
+    }
+}
+
+// Helper function to write entries to JSON file
+function writeEntries(entries) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(entries, null, 2));
+}
+
+// Route to get all entries
+router.get('/data', (req, res) => {
+    const entries = readEntries();
+    res.json(entries);
+});
+
+// Route to add a new entry
+router.post('/new_entry', (req, res) => {
+    const entries = readEntries();
+    const newEntry = {
+        id: Date.now(), // Unique ID based on timestamp
+        title: req.body.title,
+        content: req.body.content,
+        date: new Date().toLocaleDateString()
+    };
+    entries.push(newEntry); // Add the new entry to the list
+    writeEntries(entries); // Save the updated entries
+    res.json(newEntry);
+});
+
+// Route to add multiple new entries
+router.post('/entries', (req, res) => {
+    const entries = readEntries(); // Read current entries
+    const newEntries = req.body.entries; // Expecting an array of entries in the request body
+
+    if (!Array.isArray(newEntries)) {
+        return res.status(400).json({ message: 'Invalid data format. Please send an array of entries.' });
+    }
+
+    const entriesToAdd = newEntries.map(entry => ({
+        id: Date.now() + Math.random(), // Unique ID based on timestamp and random number
+        title: entry.title,
+        content: entry.content,
+        date: new Date().toLocaleDateString()
+    }));
+
+    entries.push(...entriesToAdd); // Add the new entries to the list
+    writeEntries(entries); // Save the updated entries
+    res.json({ message: 'Entries added successfully', entries: entriesToAdd });
+});
+
+// Route to update an entry by ID
+router.put('/entries/:id', (req, res) => {
+    let entries = readEntries();
+    const entryIndex = entries.findIndex(entry => entry.id === parseInt(req.params.id));
+
+    if (entryIndex !== -1) {
+        entries[entryIndex] = { ...entries[entryIndex], ...req.body }; // Update entry details
+        writeEntries(entries);
+        res.json({ message: 'Entry updated successfully', entry: entries[entryIndex] });
+    } else {
+        res.status(404).json({ message: 'Entry not found' });
+    }
+});
+
+// Route to delete an entry by ID
+router.delete('/entries/:id', (req, res) => {
+    const entries = readEntries();
+    const filteredEntries = entries.filter(entry => entry.id !== parseInt(req.params.id));
+
+    if (entries.length !== filteredEntries.length) {
+        writeEntries(filteredEntries);
+        res.json({ message: 'Entry deleted successfully' });
+    } else {
+        res.status(404).json({ message: 'Entry not found' });
+    }
+});
+
+module.exports = router;
